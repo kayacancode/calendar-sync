@@ -28,6 +28,7 @@ class AggregateReport:
     started_at: str
     finished_at: str
     created: int = 0
+    adopted: int = 0
     updated: int = 0
     deleted: int = 0
     skipped_duplicates: int = 0
@@ -39,7 +40,8 @@ class AggregateReport:
         return not self.errors
 
     def summary(self) -> str:
-        line = (f"  +{self.created} created, ~{self.updated} updated, "
+        adopted = f", ={self.adopted} adopted" if self.adopted else ""
+        line = (f"  +{self.created} created{adopted}, ~{self.updated} updated, "
                 f"-{self.deleted} deleted, {self.skipped_duplicates} duplicates skipped")
         if self.errors:
             line += f"\n  errors: {len(self.errors)}"
@@ -73,6 +75,18 @@ def _ensure_calendar(service, cfg: Config, conn) -> str:
         except HttpError as e:
             if e.resp.status not in (404, 410):
                 raise
+    # Adopt an existing calendar with the configured name, if one is already
+    # present — so a fresh DB reuses it instead of creating a duplicate.
+    page_token = None
+    while True:
+        resp = service.calendarList().list(pageToken=page_token, maxResults=250).execute()
+        for cal in resp.get("items", []):
+            if cal.get("summary") == cfg.aggregate.calendar_name:
+                db.set_state(conn, CALENDAR_ID_STATE_KEY, cal["id"])
+                return cal["id"]
+        page_token = resp.get("nextPageToken")
+        if not page_token:
+            break
     created = service.calendars().insert(body={
         "summary": cfg.aggregate.calendar_name,
         "description": "Unified view of all forever22 calendars. Managed by forever22 — do not hand-edit.",
@@ -109,6 +123,26 @@ def run(*, cfg: Config | None = None) -> AggregateReport:
             report.finished_at = datetime.now(timezone.utc).isoformat()
             return report
         report.calendar_id = cal_id
+
+        # Adoption map: events already in the aggregate calendar, keyed by their
+        # `aggregatedFrom` tag ("<source_label>:<source_event_id>").
+        agg_existing: dict[str, str] = {}
+        page_token = None
+        while True:
+            try:
+                resp = host_service.events().list(
+                    calendarId=cal_id, maxResults=250, pageToken=page_token, showDeleted=False
+                ).execute()
+            except HttpError as e:
+                report.errors.append(f"list aggregate calendar: {e._get_reason()}")
+                break
+            for ev in resp.get("items", []):
+                af = ev.get("extendedProperties", {}).get("private", {}).get(AGGREGATED_KEY)
+                if af:
+                    agg_existing[af] = ev["id"]
+            page_token = resp.get("nextPageToken")
+            if not page_token:
+                break
 
         rows = conn.execute(
             """SELECT * FROM events
@@ -157,6 +191,19 @@ def run(*, cfg: Config | None = None) -> AggregateReport:
                 body["colorId"] = color
 
             if existing is None:
+                src_ref = f"{r['account_label']}:{r['event_id']}"
+                adopt_id = agg_existing.get(src_ref)
+                if adopt_id is not None:
+                    conn.execute(
+                        """INSERT INTO aggregated
+                        (ical_uid, source_account, source_event_id, agg_event_id,
+                         start_iso, end_iso, summary, updated_at)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (uid, r["account_label"], r["event_id"], adopt_id,
+                         r["start_iso"], r["end_iso"], r["summary"], now),
+                    )
+                    report.adopted += 1
+                    continue
                 try:
                     created = host_service.events().insert(calendarId=cal_id, body=body).execute()
                     conn.execute(

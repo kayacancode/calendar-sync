@@ -18,6 +18,7 @@ MIRRORED_FROM_KEY = "mirroredFrom"
 class MirrorCount:
     label: str
     created: int = 0
+    adopted: int = 0
     updated: int = 0
     deleted: int = 0
     errors: list[str] = field(default_factory=list)
@@ -39,7 +40,10 @@ class MirrorReport:
         lines = []
         for label, c in self.counts.items():
             err = f" — errors: {len(c.errors)}" if c.errors else ""
-            lines.append(f"  {label}: +{c.created} created, ~{c.updated} updated, -{c.deleted} deleted{err}")
+            adopted = f", ={c.adopted} adopted" if c.adopted else ""
+            lines.append(
+                f"  {label}: +{c.created} created{adopted}, ~{c.updated} updated, -{c.deleted} deleted{err}"
+            )
         return "\n".join(lines)
 
 
@@ -103,6 +107,19 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
     now = now_dt.isoformat()
 
     with db.connect() as conn:
+        # Adoption map: mirror events already present on each calendar, keyed by
+        # (target_label, "<source_label>:<source_event_id>"). Lets a fresh DB
+        # take ownership of existing mirrors instead of creating duplicates.
+        adopt_map: dict[tuple[str, str], str] = {}
+        for r in conn.execute("SELECT account_label, event_id, raw_json FROM events"):
+            try:
+                raw = json.loads(r["raw_json"])
+            except (TypeError, json.JSONDecodeError):
+                continue
+            mf = raw.get("extendedProperties", {}).get("private", {}).get(MIRRORED_FROM_KEY)
+            if mf:
+                adopt_map[(r["account_label"], mf)] = r["event_id"]
+
         for source_label, targets in cfg.mirror.rules.items():
             source_events = conn.execute(
                 """
@@ -138,6 +155,18 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                     body = _mirror_body(cfg, source_label, src, src_raw)
 
                     if existing is None:
+                        adopt_id = adopt_map.get((target_label, f"{source_label}:{src['event_id']}"))
+                        if adopt_id is not None:
+                            conn.execute(
+                                """INSERT INTO mirrors
+                                (source_account_label, source_event_id, target_account_label, target_event_id,
+                                 source_start_iso, source_end_iso, source_summary, created_at, updated_at)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                (source_label, src["event_id"], target_label, adopt_id,
+                                 src["start_iso"], src["end_iso"], src["summary"], now, now),
+                            )
+                            counts[source_label].adopted += 1
+                            continue
                         try:
                             created = target_service.events().insert(
                                 calendarId="primary", body=body
