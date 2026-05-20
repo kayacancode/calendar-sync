@@ -26,31 +26,31 @@ def _binary() -> str:
 def status() -> BestmateResult:
     try:
         p = subprocess.run([_binary(), "status"], capture_output=True, text=True, timeout=15)
-    except BestmateUnavailable as e:
+        return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
+    except Exception as e:
         return BestmateResult(ok=False, output="", error=str(e))
-    return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
 
 
 def ask(query: str, *, target: str | None = None, timeout: int = 60) -> BestmateResult:
-    cmd = [_binary(), "ask"]
-    if target:
-        cmd += ["--target", target]
-    cmd.append(query)
     try:
+        cmd = [_binary(), "ask"]
+        if target:
+            cmd += ["--target", target]
+        cmd.append(query)
         p = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-    except BestmateUnavailable as e:
+        return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
+    except Exception as e:
         return BestmateResult(ok=False, output="", error=str(e))
-    return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
 
 
 def ingest(content: str, *, title: str, tags: list[str] | None = None,
            visibility: str = "private", source: str = "forever22",
            timeout: int = 60) -> BestmateResult:
-    cmd = [_binary(), "ingest", "--title", title, "--source", source, f"--{visibility}"]
-    if tags:
-        cmd += ["--tags", ",".join(tags)]
     try:
+        cmd = [_binary(), "ingest", "--title", title, "--source", source, f"--{visibility}"]
+        if tags:
+            cmd += ["--tags", ",".join(tags)]
         p = subprocess.run(cmd, input=content, capture_output=True, text=True, timeout=timeout)
-    except BestmateUnavailable as e:
+        return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
+    except Exception as e:
         return BestmateResult(ok=False, output="", error=str(e))
-    return BestmateResult(ok=p.returncode == 0, output=p.stdout.strip(), error=p.stderr.strip())
