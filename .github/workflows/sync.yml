@@ -1,0 +1,66 @@
+name: calendar-sync
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"   # every 15 min (best-effort; GitHub may delay)
+  workflow_dispatch: {}        # allow manual runs
+
+concurrency:
+  group: calendar-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install
+        run: pip install -e . --quiet
+
+      - name: Restore state DB
+        uses: actions/cache/restore@v4
+        with:
+          path: data/events.db
+          key: state-db-${{ github.run_id }}
+          restore-keys: state-db-
+
+      - name: Materialize credentials from secrets
+        env:
+          CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
+          CONFIG_YAML: ${{ secrets.CONFIG_YAML }}
+          ACCOUNT_PERSONAL: ${{ secrets.ACCOUNT_PERSONAL }}
+          ACCOUNT_FOREVER22: ${{ secrets.ACCOUNT_FOREVER22 }}
+          ACCOUNT_BETAWORKS: ${{ secrets.ACCOUNT_BETAWORKS }}
+          ACCOUNT_ANDUS: ${{ secrets.ACCOUNT_ANDUS }}
+        run: |
+          printf '%s' "$CREDENTIALS_JSON" > credentials.json
+          printf '%s' "$CONFIG_YAML" > config.yaml
+          mkdir -p accounts data
+          printf '%s' "$ACCOUNT_PERSONAL"  > accounts/personal.json
+          printf '%s' "$ACCOUNT_FOREVER22" > accounts/forever22.json
+          printf '%s' "$ACCOUNT_BETAWORKS" > accounts/betaworks.json
+          printf '%s' "$ACCOUNT_ANDUS"     > accounts/andus.json
+
+      - name: Sync
+        run: |
+          if f22 sync > sync-output.txt 2>&1; then
+            echo "sync ok ($(date -u '+%Y-%m-%dT%H:%M:%SZ'))"
+          else
+            echo "SYNC FAILED:"
+            cat sync-output.txt
+            exit 1
+          fi
+
+      - name: Save state DB
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: data/events.db
+          key: state-db-${{ github.run_id }}
