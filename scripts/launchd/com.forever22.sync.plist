@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Scheduled sync for calendar-sync.
+  Before installing, replace /ABSOLUTE/PATH/TO/calendar-sync below with the
+  real absolute path to your checkout, then:
+    cp scripts/launchd/com.forever22.sync.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.forever22.sync.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.forever22.sync</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/ABSOLUTE/PATH/TO/calendar-sync/.venv/bin/f22</string>
+        <string>sync</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/ABSOLUTE/PATH/TO/calendar-sync</string>
+
+    <key>StartInterval</key>
+    <integer>600</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/ABSOLUTE/PATH/TO/calendar-sync/data/sync.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/ABSOLUTE/PATH/TO/calendar-sync/data/sync.err.log</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/ABSOLUTE/PATH/TO/calendar-sync/.venv/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+</dict>
+</plist>

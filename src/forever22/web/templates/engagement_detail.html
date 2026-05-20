@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ e.title }} · forever22{% endblock %}
+{% block content %}
+<p><a href="/engagements">← all engagements</a></p>
+<h1>{{ e.title }}</h1>
+<p class="meta">
+  <span class="status status-{{ e.status }}">{{ e.status }}</span>
+  · {{ e.type }}{% if e.client %} · <span class="dot dot-{{ e.client }}"></span>{{ e.client }}{% endif %}
+  {% if e.start_date %} · started {{ e.start_date }}{% endif %}
+</p>
+
+<div class="kpi">
+  <div><strong>{{ '%.1f'|format(e.total_hours) }}h</strong><span>logged</span></div>
+  {% if e.hours_committed_per_week %}<div><strong>{{ e.hours_committed_per_week }}h</strong><span>per week</span></div>{% endif %}
+  <div><strong>{{ e.time_log|length }}</strong><span>entries</span></div>
+</div>
+
+{% if e.contacts %}
+<h2>Contacts</h2>
+<ul>
+  {% for c in e.contacts %}<li>{{ c.name }} {% if c.email %}&lt;{{ c.email }}&gt;{% endif %} {% if c.role %}— {{ c.role }}{% endif %}</li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if e.links %}
+<h2>Links</h2>
+<ul>
+  {% for l in e.links %}<li><a href="{{ l }}" target="_blank" rel="noopener">{{ l }}</a></li>{% endfor %}
+</ul>
+{% endif %}
+
+{% if e.time_log %}
+<h2>Time log</h2>
+<table class="timelog">
+  <thead><tr><th>Date</th><th>Hours</th><th>Note</th></tr></thead>
+  <tbody>
+    {% for t in e.time_log|reverse %}
+    <tr><td>{{ t.date }}</td><td>{{ t.hours }}</td><td>{{ t.note }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% if e.notes %}
+<h2>Notes</h2>
+<pre class="notes">{{ e.notes }}</pre>
+{% endif %}
+
+<p class="file-path"><code>{{ e.path }}</code></p>
+{% endblock %}

@@ -1,0 +1,53 @@
+# Copy this file to config.yaml and fill in your real values.
+#   cp config.example.yaml config.yaml
+# config.yaml is gitignored — it holds your real email addresses.
+
+google_oauth:
+  client_secrets_file: credentials.json
+  scopes:
+    - https://www.googleapis.com/auth/calendar
+
+sync:
+  past_days: 7
+  future_days: 60
+  bestmate_digest: true
+
+# Optional bestmate (AI knowledge-twin CLI) integration.
+bestmate:
+  target: your-twin-name
+  visibility: private
+
+# Mirror busy events across calendars so no account can be double-booked.
+# Each key is a source account; the list is which accounts to mirror its
+# busy times onto. Set enabled: false to turn mirroring off.
+mirror:
+  enabled: true
+  mirror_title: "Busy"
+  rules:
+    personal:  [work, client-a, client-b]
+    work:      [personal, client-a, client-b]
+    client-a:  [personal, work, client-b]
+    client-b:  [personal, work, client-a]
+
+# Build one deduplicated calendar with the real events from every account.
+aggregate:
+  enabled: true
+  host_account: personal
+  calendar_name: "Unified Calendar"
+
+# One entry per Google account to unify. `label` is an arbitrary nickname
+# used everywhere else in this config and on the CLI; `color` is used in the
+# terminal views.
+accounts:
+  - label: personal
+    email: REPLACE_WITH_EMAIL
+    color: magenta
+  - label: work
+    email: REPLACE_WITH_EMAIL
+    color: yellow
+  - label: client-a
+    email: REPLACE_WITH_EMAIL
+    color: green
+  - label: client-b
+    email: REPLACE_WITH_EMAIL
+    color: blue

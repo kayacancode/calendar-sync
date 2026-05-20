@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}today · forever22{% endblock %}
+{% block content %}
+<h1>{{ day_label }}</h1>
+{% if not events %}
+  <p class="empty">no events today</p>
+{% else %}
+<table class="events">
+  <thead><tr><th>When</th><th>Account</th><th>Event</th></tr></thead>
+  <tbody>
+  {% for ev in events %}
+    <tr class="acct-{{ ev.label }} {% if not ev.is_busy %}free{% endif %}">
+      <td class="when">{{ ev.when }}</td>
+      <td class="account"><span class="dot dot-{{ ev.label }}"></span>{{ ev.label }}</td>
+      <td class="summary">{{ ev.summary }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}

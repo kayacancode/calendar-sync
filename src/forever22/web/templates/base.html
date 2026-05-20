@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}forever22{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header>
+    <div class="brand"><a href="/today">forever22</a></div>
+    <nav>
+      <a href="/today">today</a>
+      <a href="/week">week</a>
+      <a href="/engagements">engagements</a>
+    </nav>
+    <form class="ask" method="post" action="/ask">
+      <input type="hidden" name="redirect_to" value="{{ request.url.path }}">
+      <input type="text" name="query" placeholder="ask the twin…" required>
+      <button type="submit">ask</button>
+    </form>
+  </header>
+  {% if request.query_params.get('q') %}
+  <section class="twin-answer">
+    <div class="q"><strong>You asked:</strong> {{ request.query_params.get('q') }}</div>
+    <div class="a">{{ request.query_params.get('a') }}</div>
+  </section>
+  {% endif %}
+  <main>
+    {% block content %}{% endblock %}
+  </main>
+  <footer>
+    <span>kaya's command center · /static/style.css</span>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,28 @@
+# secrets & credentials — never commit
+credentials.json
+client_secret*.json
+.env
+accounts/*.json
+
+# local data: calendar cache, sync logs
+data/*
+!data/.gitkeep
+
+# personal config & engagement data — kept local only
+config.yaml
+engagements/
+
+# Claude Code local settings
+.claude/
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+build/
+dist/
+
+# misc
+.DS_Store

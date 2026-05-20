@@ -1,0 +1,32 @@
+[project]
+name = "forever22"
+version = "0.1.0"
+description = "Unified calendar sync across multiple Google accounts, with busy-mirroring and an engagement tracker"
+requires-python = ">=3.11"
+dependencies = [
+    "google-api-python-client>=2.150",
+    "google-auth>=2.35",
+    "google-auth-oauthlib>=1.2",
+    "typer>=0.15",
+    "rich>=13.9",
+    "pyyaml>=6.0",
+    "python-dateutil>=2.9",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "jinja2>=3.1",
+    "python-multipart>=0.0.20",
+    "dateparser>=1.2",
+]
+
+[project.scripts]
+f22 = "forever22.cli:app"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"forever22.web" = ["templates/*.html", "static/*"]

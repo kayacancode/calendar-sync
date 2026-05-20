@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}engagements · forever22{% endblock %}
+{% block content %}
+<h1>engagements</h1>
+<div class="filter-bar">
+  <a href="/engagements" {% if not filter_status %}class="active"{% endif %}>all</a>
+  <a href="/engagements?status=active" {% if filter_status == 'active' %}class="active"{% endif %}>active</a>
+  <a href="/engagements?status=paused" {% if filter_status == 'paused' %}class="active"{% endif %}>paused</a>
+  <a href="/engagements?status=completed" {% if filter_status == 'completed' %}class="active"{% endif %}>completed</a>
+</div>
+
+{% if not engagements %}
+  <p class="empty">no engagements yet — try <code>f22 eng add</code></p>
+{% else %}
+<table class="engagements">
+  <thead>
+    <tr>
+      <th>Title</th>
+      <th>Type</th>
+      <th>Client</th>
+      <th>Status</th>
+      <th>Committed</th>
+      <th>Logged</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for e in engagements %}
+    <tr class="status-{{ e.status }}">
+      <td><a href="/engagements/{{ e.slug }}"><strong>{{ e.title }}</strong></a></td>
+      <td>{{ e.type }}</td>
+      <td>{% if e.client %}<span class="dot dot-{{ e.client }}"></span>{{ e.client }}{% endif %}</td>
+      <td><span class="status status-{{ e.status }}">{{ e.status }}</span></td>
+      <td>{% if e.hours_committed_per_week %}{{ e.hours_committed_per_week }}h/wk{% endif %}</td>
+      <td>{{ '%.1f'|format(e.total_hours) }}h</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock %}
