@@ -204,7 +204,6 @@ def cmd_eng_show(slug: str = typer.Argument(...)) -> None:
     if e.notes:
         console.print("\n[bold]notes[/bold]")
         console.print(e.notes)
-    console.print(f"\nfile: {e.path}")
 
 
 @eng_app.command("log")

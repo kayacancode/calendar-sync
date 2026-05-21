@@ -151,9 +151,7 @@ def run(*, cfg: Config | None = None, lookback_days: int = 30,
             res.hours += hrs
 
         if new_entries and not dry_run:
-            eng.time_log.extend(new_entries)
-            eng.time_log.sort(key=lambda t: t.date)
-            engagements.save(eng)
+            engagements.add_time_entries(slug, new_entries)
         report.results.append(res)
 
     return report

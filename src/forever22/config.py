@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -69,6 +70,26 @@ class Config:
 
     def token_path(self, label: str) -> Path:
         return ACCOUNTS_DIR / f"{label}.json"
+
+
+def database_url() -> str:
+    """Postgres connection URL for the engagement database.
+
+    Read from the FOREVER22_DB_URL env var, falling back to a .env file at the
+    repo root. The env var is how the cloud workflow injects it (from a secret).
+    """
+    url = os.environ.get("FOREVER22_DB_URL")
+    if url:
+        return url
+    env_path = REPO_ROOT / ".env"
+    if env_path.exists():
+        for line in env_path.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("FOREVER22_DB_URL=") and not line.startswith("#"):
+                return line.split("=", 1)[1].strip()
+    raise RuntimeError(
+        "FOREVER22_DB_URL is not set — add it to the environment or a .env file."
+    )
 
 
 def load() -> Config:
