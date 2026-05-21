@@ -23,6 +23,7 @@ class TimeLogEntry:
     date: str
     hours: float
     note: str = ""
+    source_event_id: str = ""
 
 
 @dataclass
@@ -42,6 +43,7 @@ class Engagement:
     start_date: str | None = None
     end_date: str | None = None
     hours_committed_per_week: float | None = None
+    calendar_account: str | None = None
     contacts: list[Contact] = field(default_factory=list)
     links: list[str] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
@@ -73,6 +75,8 @@ def _frontmatter_payload(eng: Engagement) -> dict[str, Any]:
     data.pop("notes", None)
     for k in ("client",) if eng.type != "client" else ():
         data.pop(k, None)
+    if data.get("calendar_account") is None:
+        data.pop("calendar_account", None)
     if not data.get("contacts"):
         data["contacts"] = []
     if not data.get("time_log"):
@@ -98,6 +102,7 @@ def _parse_file(path: Path) -> Engagement:
         start_date=front.get("start_date"),
         end_date=front.get("end_date"),
         hours_committed_per_week=front.get("hours_committed_per_week"),
+        calendar_account=front.get("calendar_account"),
         contacts=contacts,
         links=list(front.get("links") or []),
         tags=list(front.get("tags") or []),

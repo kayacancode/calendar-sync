@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from . import aggregate, auth, bestmate, blocks, engagements, mirror, sync, view
+from . import aggregate, auth, autolog, bestmate, blocks, engagements, mirror, sync, view
 from .config import load
 
 app = typer.Typer(help="forever22 — unified calendar across Kaya's accounts.", no_args_is_help=True)
@@ -217,6 +217,25 @@ def cmd_eng_log(
     """Log time against an engagement."""
     eng = engagements.log_time(slug, hours=hours, note=note, when=when)
     console.print(f"[green]✓[/green] logged {hours}h to {eng.slug} (total: {eng.total_hours:.1f}h)")
+
+
+@app.command("autolog")
+def cmd_autolog(
+    lookback_days: int = typer.Option(30, "--lookback-days", "-d", help="How far back to scan"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="Preview without writing to engagement files"),
+) -> None:
+    """Auto-log completed client meetings as time entries on their engagements.
+
+    Scans each engagement's `calendar_account`, logs finished meetings that have
+    other attendees, and dedupes by event ID so nothing is logged twice.
+    """
+    cfg = load()
+    report = autolog.run(cfg=cfg, lookback_days=lookback_days, dry_run=dry_run)
+    if report.dry_run:
+        console.print("[yellow]dry run — no engagement files written[/yellow]")
+    console.print(report.summary())
+    if not report.ok:
+        raise typer.Exit(code=1)
 
 
 @block_app.command("create")
