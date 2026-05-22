@@ -24,6 +24,13 @@ jobs:
       - name: Install
         run: pip install -e . --quiet
 
+      - name: Restore sync state DB
+        uses: actions/cache/restore@v4
+        with:
+          path: data/events.db
+          key: state-db-${{ github.run_id }}
+          restore-keys: state-db-
+
       - name: Materialize credentials from secrets
         env:
           CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
@@ -50,5 +57,15 @@ jobs:
           else
             echo "AUTOLOG FAILED:"
             cat autolog-output.txt
+            exit 1
+          fi
+
+      - name: Refresh unified calendar
+        run: |
+          if f22 aggregate --refresh > aggregate-output.txt 2>&1; then
+            echo "aggregate refresh ok ($(date -u '+%Y-%m-%dT%H:%M:%SZ'))"
+          else
+            echo "AGGREGATE REFRESH FAILED:"
+            cat aggregate-output.txt
             exit 1
           fi
