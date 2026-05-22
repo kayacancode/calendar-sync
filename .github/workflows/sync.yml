@@ -24,13 +24,6 @@ jobs:
       - name: Install
         run: pip install -e . --quiet
 
-      - name: Restore state DB
-        uses: actions/cache/restore@v4
-        with:
-          path: data/events.db
-          key: state-db-${{ github.run_id }}
-          restore-keys: state-db-
-
       - name: Materialize credentials from secrets
         env:
           CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
@@ -49,6 +42,8 @@ jobs:
           printf '%s' "$ACCOUNT_ANDUS"     > accounts/andus.json
 
       - name: Sync
+        env:
+          FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
         run: |
           if f22 sync > sync-output.txt 2>&1; then
             echo "sync ok ($(date -u '+%Y-%m-%dT%H:%M:%SZ'))"
@@ -57,10 +52,3 @@ jobs:
             cat sync-output.txt
             exit 1
           fi
-
-      - name: Save state DB
-        if: always()
-        uses: actions/cache/save@v4
-        with:
-          path: data/events.db
-          key: state-db-${{ github.run_id }}

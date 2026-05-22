@@ -24,13 +24,6 @@ jobs:
       - name: Install
         run: pip install -e . --quiet
 
-      - name: Restore sync state DB
-        uses: actions/cache/restore@v4
-        with:
-          path: data/events.db
-          key: state-db-${{ github.run_id }}
-          restore-keys: state-db-
-
       - name: Materialize credentials from secrets
         env:
           CREDENTIALS_JSON: ${{ secrets.CREDENTIALS_JSON }}
@@ -61,6 +54,8 @@ jobs:
           fi
 
       - name: Refresh unified calendar
+        env:
+          FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
         run: |
           if f22 aggregate --refresh > aggregate-output.txt 2>&1; then
             echo "aggregate refresh ok ($(date -u '+%Y-%m-%dT%H:%M:%SZ'))"

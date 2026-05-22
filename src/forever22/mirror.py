@@ -124,8 +124,8 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
             source_events = conn.execute(
                 """
                 SELECT * FROM events
-                WHERE account_label = ? AND is_busy = 1
-                  AND end_iso > ? AND start_iso < ?
+                WHERE account_label = %s AND is_busy = 1
+                  AND end_iso > %s AND start_iso < %s
                   AND COALESCE(status, 'confirmed') != 'cancelled'
                 """,
                 (source_label, window_start, window_end),
@@ -144,7 +144,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                         continue
                     existing = conn.execute(
                         """SELECT * FROM mirrors
-                        WHERE source_account_label = ? AND source_event_id = ? AND target_account_label = ?""",
+                        WHERE source_account_label = %s AND source_event_id = %s AND target_account_label = %s""",
                         (source_label, src["event_id"], target_label),
                     ).fetchone()
                     try:
@@ -161,7 +161,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                                 """INSERT INTO mirrors
                                 (source_account_label, source_event_id, target_account_label, target_event_id,
                                  source_start_iso, source_end_iso, source_summary, created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                                 (source_label, src["event_id"], target_label, adopt_id,
                                  src["start_iso"], src["end_iso"], src["summary"], now, now),
                             )
@@ -175,7 +175,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                                 """INSERT INTO mirrors
                                 (source_account_label, source_event_id, target_account_label, target_event_id,
                                  source_start_iso, source_end_iso, source_summary, created_at, updated_at)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                                 (source_label, src["event_id"], target_label, created["id"],
                                  src["start_iso"], src["end_iso"], src["summary"], now, now),
                             )
@@ -194,8 +194,8 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                                 ).execute()
                                 conn.execute(
                                     """UPDATE mirrors SET
-                                    source_start_iso = ?, source_end_iso = ?, source_summary = ?, updated_at = ?
-                                    WHERE source_account_label = ? AND source_event_id = ? AND target_account_label = ?""",
+                                    source_start_iso = %s, source_end_iso = %s, source_summary = %s, updated_at = %s
+                                    WHERE source_account_label = %s AND source_event_id = %s AND target_account_label = %s""",
                                     (src["start_iso"], src["end_iso"], src["summary"], now,
                                      source_label, src["event_id"], target_label),
                                 )
@@ -204,7 +204,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                                 if e.resp.status in (404, 410):
                                     conn.execute(
                                         """DELETE FROM mirrors
-                                        WHERE source_account_label = ? AND source_event_id = ? AND target_account_label = ?""",
+                                        WHERE source_account_label = %s AND source_event_id = %s AND target_account_label = %s""",
                                         (source_label, src["event_id"], target_label),
                                     )
                                 else:
@@ -249,7 +249,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                 continue
             conn.execute(
                 """DELETE FROM mirrors
-                WHERE source_account_label = ? AND source_event_id = ? AND target_account_label = ?""",
+                WHERE source_account_label = %s AND source_event_id = %s AND target_account_label = %s""",
                 (src_label, orphan["source_event_id"], target_label),
             )
             counter.deleted += 1

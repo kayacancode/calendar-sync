@@ -160,7 +160,7 @@ def create(*, reason: str, when: str, mode: str = "busy",
                 conn.execute(
                     """INSERT INTO blocks (block_id, account_label, event_id, mode, target_label,
                                            start_iso, end_iso, reason, created_at)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                     (block_id, label, created["id"], mode, target_label,
                      block.start_iso, block.end_iso, reason, now),
                 )
@@ -177,7 +177,7 @@ def list_blocks(*, future_only: bool = True) -> list[Block]:
     with db.connect() as conn:
         sql = "SELECT * FROM blocks"
         if future_only:
-            sql += " WHERE end_iso > ?"
+            sql += " WHERE end_iso > %s"
             rows = conn.execute(sql + " ORDER BY start_iso", (now_iso,)).fetchall()
         else:
             rows = conn.execute(sql + " ORDER BY start_iso").fetchall()
@@ -202,7 +202,7 @@ def delete(block_id: str, *, cfg: Config | None = None) -> tuple[int, list[str]]
     errors: list[str] = []
     deleted = 0
     with db.connect() as conn:
-        rows = conn.execute("SELECT * FROM blocks WHERE block_id = ?", (block_id,)).fetchall()
+        rows = conn.execute("SELECT * FROM blocks WHERE block_id = %s", (block_id,)).fetchall()
         if not rows:
             raise KeyError(f"no block with id {block_id}")
         for r in rows:
@@ -220,7 +220,7 @@ def delete(block_id: str, *, cfg: Config | None = None) -> tuple[int, list[str]]
                 errors.append(f"{label}: {e}")
                 continue
             conn.execute(
-                "DELETE FROM blocks WHERE block_id = ? AND account_label = ?",
+                "DELETE FROM blocks WHERE block_id = %s AND account_label = %s",
                 (block_id, label),
             )
             deleted += 1

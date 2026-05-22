@@ -66,7 +66,7 @@ def _describe(raw: dict, source_label: str) -> str:
     if attendees:
         parts = []
         for a in attendees:
-            name = "you" if a.get("self") else (a.get("displayName") or a.get("email") or "?")
+            name = "you" if a.get("self") else (a.get("displayName") or a.get("email") or "(unknown)")
             status = _RSVP.get(a.get("responseStatus", ""), "")
             parts.append(f"{name} ({status})" if status else name)
         lines.append("Attendees: " + ", ".join(parts))
@@ -196,7 +196,7 @@ def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
             r = item["row"]
             raw = item["raw"]
             existing = conn.execute(
-                "SELECT * FROM aggregated WHERE ical_uid = ?", (uid,)
+                "SELECT * FROM aggregated WHERE ical_uid = %s", (uid,)
             ).fetchone()
             start, end = _start_end_fields(raw)
             body = {
@@ -223,7 +223,7 @@ def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
                         """INSERT INTO aggregated
                         (ical_uid, source_account, source_event_id, agg_event_id,
                          start_iso, end_iso, summary, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                         (uid, r["account_label"], r["event_id"], adopt_id,
                          r["start_iso"], r["end_iso"], r["summary"], now),
                     )
@@ -235,7 +235,7 @@ def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
                         """INSERT INTO aggregated
                         (ical_uid, source_account, source_event_id, agg_event_id,
                          start_iso, end_iso, summary, updated_at)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
                         (uid, r["account_label"], r["event_id"], created["id"],
                          r["start_iso"], r["end_iso"], r["summary"], now),
                     )
@@ -252,14 +252,14 @@ def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
                             calendarId=cal_id, eventId=existing["agg_event_id"], body=body
                         ).execute()
                         conn.execute(
-                            """UPDATE aggregated SET start_iso=?, end_iso=?, summary=?, updated_at=?
-                            WHERE ical_uid=?""",
+                            """UPDATE aggregated SET start_iso=%s, end_iso=%s, summary=%s, updated_at=%s
+                            WHERE ical_uid=%s""",
                             (r["start_iso"], r["end_iso"], r["summary"], now, uid),
                         )
                         report.updated += 1
                     except HttpError as e:
                         if e.resp.status in (404, 410):
-                            conn.execute("DELETE FROM aggregated WHERE ical_uid=?", (uid,))
+                            conn.execute("DELETE FROM aggregated WHERE ical_uid=%s", (uid,))
                         else:
                             report.errors.append(f"update {uid}: {e._get_reason()}")
 
@@ -277,7 +277,7 @@ def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
             except Exception as e:
                 report.errors.append(f"delete {agg['ical_uid']}: {e}")
                 continue
-            conn.execute("DELETE FROM aggregated WHERE ical_uid=?", (agg["ical_uid"],))
+            conn.execute("DELETE FROM aggregated WHERE ical_uid=%s", (agg["ical_uid"],))
             report.deleted += 1
 
     report.finished_at = datetime.now(timezone.utc).isoformat()

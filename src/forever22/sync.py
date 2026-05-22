@@ -90,10 +90,10 @@ def _sync_account(service, account: Account, cfg: Config, conn) -> AccountSyncRe
     existing_ids = {
         row["event_id"]
         for row in conn.execute(
-            "SELECT event_id FROM events WHERE account_label = ?", (account.label,)
+            "SELECT event_id FROM events WHERE account_label = %s", (account.label,)
         )
     }
-    conn.execute("DELETE FROM events WHERE account_label = ?", (account.label,))
+    conn.execute("DELETE FROM events WHERE account_label = %s", (account.label,))
 
     new_ids: set[str] = set()
     for event in fetched:

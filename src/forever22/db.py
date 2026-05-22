@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-import sqlite3
 from contextlib import contextmanager
-from pathlib import Path
 
-from .config import DB_PATH, DATA_DIR
+import psycopg
+from psycopg.rows import dict_row
 
+from .config import database_url
+
+# All forever22 state — calendar cache plus the stateful mirror/aggregate/block
+# tracking — lives in one Postgres database so local runs and the cloud cron
+# share a single source of truth (no divergence).
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS events (
     account_label TEXT NOT NULL,
@@ -20,7 +24,6 @@ CREATE TABLE IF NOT EXISTS events (
     synced_at     TEXT NOT NULL,
     PRIMARY KEY (account_label, event_id)
 );
-
 CREATE INDEX IF NOT EXISTS events_time ON events(start_iso, end_iso);
 CREATE INDEX IF NOT EXISTS events_account ON events(account_label);
 
@@ -76,36 +79,42 @@ CREATE TABLE IF NOT EXISTS aggregated (
 );
 """
 
+_schema_ready = False
+
+
+def _ensure_schema(conn) -> None:
+    global _schema_ready
+    if _schema_ready:
+        return
+    conn.execute(SCHEMA)
+    conn.commit()
+    _schema_ready = True
+
+
+@contextmanager
+def connect():
+    conn = psycopg.connect(
+        database_url(), prepare_threshold=None, connect_timeout=20, row_factory=dict_row
+    )
+    try:
+        _ensure_schema(conn)
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
 
 def get_state(conn, key: str) -> str | None:
-    row = conn.execute("SELECT value FROM app_state WHERE key = ?", (key,)).fetchone()
+    row = conn.execute("SELECT value FROM app_state WHERE key = %s", (key,)).fetchone()
     return row["value"] if row else None
 
 
 def set_state(conn, key: str, value: str) -> None:
     conn.execute(
-        """INSERT INTO app_state (key, value) VALUES (?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value""",
+        """INSERT INTO app_state (key, value) VALUES (%s, %s)
+        ON CONFLICT (key) DO UPDATE SET value = excluded.value""",
         (key, value),
     )
-
-
-def ensure_db(path: Path = DB_PATH) -> None:
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    with sqlite3.connect(path) as conn:
-        conn.executescript(SCHEMA)
-
-
-@contextmanager
-def connect(path: Path = DB_PATH):
-    ensure_db(path)
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    try:
-        yield conn
-        conn.commit()
-    finally:
-        conn.close()
 
 
 def upsert_event(conn, *, account_label: str, event_id: str, calendar_id: str,
@@ -115,8 +124,8 @@ def upsert_event(conn, *, account_label: str, event_id: str, calendar_id: str,
         """
         INSERT INTO events (account_label, event_id, calendar_id, start_iso, end_iso,
                             summary, status, is_busy, raw_json, synced_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ON CONFLICT(account_label, event_id) DO UPDATE SET
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ON CONFLICT (account_label, event_id) DO UPDATE SET
             calendar_id=excluded.calendar_id,
             start_iso=excluded.start_iso,
             end_iso=excluded.end_iso,
@@ -132,12 +141,12 @@ def upsert_event(conn, *, account_label: str, event_id: str, calendar_id: str,
 
 
 def delete_event(conn, *, account_label: str, event_id: str) -> None:
-    conn.execute("DELETE FROM events WHERE account_label = ? AND event_id = ?",
+    conn.execute("DELETE FROM events WHERE account_label = %s AND event_id = %s",
                  (account_label, event_id))
 
 
 def get_sync_token(conn, account_label: str) -> str | None:
-    row = conn.execute("SELECT sync_token FROM sync_state WHERE account_label = ?",
+    row = conn.execute("SELECT sync_token FROM sync_state WHERE account_label = %s",
                        (account_label,)).fetchone()
     return row["sync_token"] if row else None
 
@@ -147,8 +156,8 @@ def set_sync_state(conn, *, account_label: str, sync_token: str | None,
     conn.execute(
         """
         INSERT INTO sync_state (account_label, sync_token, last_full_at, last_run_at)
-        VALUES (?, ?, ?, ?)
-        ON CONFLICT(account_label) DO UPDATE SET
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (account_label) DO UPDATE SET
             sync_token = COALESCE(excluded.sync_token, sync_state.sync_token),
             last_full_at = COALESCE(excluded.last_full_at, sync_state.last_full_at),
             last_run_at = excluded.last_run_at
@@ -157,11 +166,11 @@ def set_sync_state(conn, *, account_label: str, sync_token: str | None,
     )
 
 
-def events_in_range(conn, *, start_iso: str, end_iso: str) -> list[sqlite3.Row]:
+def events_in_range(conn, *, start_iso: str, end_iso: str) -> list[dict]:
     return conn.execute(
         """
         SELECT * FROM events
-        WHERE end_iso > ? AND start_iso < ?
+        WHERE end_iso > %s AND start_iso < %s
           AND COALESCE(status, 'confirmed') != 'cancelled'
         ORDER BY start_iso
         """,
@@ -169,7 +178,7 @@ def events_in_range(conn, *, start_iso: str, end_iso: str) -> list[sqlite3.Row]:
     ).fetchall()
 
 
-def sync_status(conn) -> list[sqlite3.Row]:
+def sync_status(conn) -> list[dict]:
     return conn.execute(
         """
         SELECT s.account_label, s.last_run_at, s.last_full_at,
