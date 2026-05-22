@@ -210,14 +210,25 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                                 else:
                                     counts[source_label].errors.append(f"{target_label} update: {e._get_reason()}")
 
-        orphans = conn.execute(
+        # A mirror is an orphan if its source event is gone/cancelled, OR if
+        # the (source -> target) pair is no longer allowed by mirror.rules
+        # (e.g. a target was removed from config). Both get cleaned up.
+        all_mirrors = conn.execute(
             """
-            SELECT m.* FROM mirrors m
+            SELECT m.*,
+              CASE WHEN e.event_id IS NOT NULL
+                        AND COALESCE(e.status, 'confirmed') != 'cancelled'
+                   THEN 1 ELSE 0 END AS source_alive
+            FROM mirrors m
             LEFT JOIN events e
               ON e.account_label = m.source_account_label AND e.event_id = m.source_event_id
-            WHERE e.event_id IS NULL OR COALESCE(e.status, 'confirmed') = 'cancelled'
             """
         ).fetchall()
+        orphans = [
+            m for m in all_mirrors
+            if not m["source_alive"]
+            or m["target_account_label"] not in cfg.mirror.rules.get(m["source_account_label"], [])
+        ]
 
         for orphan in orphans:
             src_label = orphan["source_account_label"]

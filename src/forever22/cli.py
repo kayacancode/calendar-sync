@@ -69,13 +69,15 @@ def cmd_mirror() -> None:
 
 
 @app.command("aggregate")
-def cmd_aggregate() -> None:
+def cmd_aggregate(
+    refresh: bool = typer.Option(False, "--refresh", help="Re-patch every event (use after changing the event format)"),
+) -> None:
     """Update the unified 'forever22 — All' calendar with deduplicated real events."""
     cfg = load()
     if not cfg.aggregate.enabled:
         console.print("[yellow]aggregate is disabled in config.yaml[/yellow]")
         raise typer.Exit(code=0)
-    report = aggregate.run(cfg=cfg)
+    report = aggregate.run(cfg=cfg, refresh=refresh)
     console.print(f"Aggregate finished at {report.finished_at}")
     if report.calendar_id:
         console.print(f"  calendar: {report.calendar_id}")

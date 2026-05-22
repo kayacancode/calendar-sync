@@ -53,6 +53,29 @@ def _is_synthetic(raw: dict) -> bool:
     return "mirroredFrom" in priv or "f22Block" in priv or AGGREGATED_KEY in priv
 
 
+_RSVP = {"accepted": "accepted", "declined": "declined",
+         "tentative": "tentative", "needsAction": "no response"}
+
+
+def _describe(raw: dict, source_label: str) -> str:
+    lines = [f"From {source_label} · unified by forever22."]
+    loc = raw.get("location")
+    if loc:
+        lines.append(f"Location: {loc}")
+    attendees = raw.get("attendees") or []
+    if attendees:
+        parts = []
+        for a in attendees:
+            name = "you" if a.get("self") else (a.get("displayName") or a.get("email") or "?")
+            status = _RSVP.get(a.get("responseStatus", ""), "")
+            parts.append(f"{name} ({status})" if status else name)
+        lines.append("Attendees: " + ", ".join(parts))
+    link = raw.get("htmlLink")
+    if link:
+        lines.append(f"↗ Open original: {link}")
+    return "\n".join(lines)
+
+
 def _start_end_fields(raw: dict) -> tuple[dict, dict]:
     s, e = raw.get("start", {}), raw.get("end", {})
     if "date" in s:
@@ -96,7 +119,7 @@ def _ensure_calendar(service, cfg: Config, conn) -> str:
     return created["id"]
 
 
-def run(*, cfg: Config | None = None) -> AggregateReport:
+def run(*, cfg: Config | None = None, refresh: bool = False) -> AggregateReport:
     cfg = cfg or load()
     started = datetime.now(timezone.utc).isoformat()
     report = AggregateReport(started_at=started, finished_at=started)
@@ -180,12 +203,14 @@ def run(*, cfg: Config | None = None) -> AggregateReport:
                 "summary": r["summary"] or "(no title)",
                 "start": start,
                 "end": end,
-                "description": f"From {r['account_label']} · unified by forever22.",
+                "description": _describe(raw, r["account_label"]),
                 "extendedProperties": {
                     "private": {AGGREGATED_KEY: f"{r['account_label']}:{r['event_id']}"}
                 },
                 "reminders": {"useDefault": False},
             }
+            if raw.get("location"):
+                body["location"] = raw["location"]
             color = _COLOR_BY_LABEL.get(r["account_label"])
             if color:
                 body["colorId"] = color
@@ -218,7 +243,8 @@ def run(*, cfg: Config | None = None) -> AggregateReport:
                 except HttpError as e:
                     report.errors.append(f"create {uid}: {e._get_reason()}")
             else:
-                if (existing["start_iso"] != r["start_iso"]
+                if (refresh
+                        or existing["start_iso"] != r["start_iso"]
                         or existing["end_iso"] != r["end_iso"]
                         or (existing["summary"] or "") != (r["summary"] or "")):
                     try:
