@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from . import bestmate, db
 from .config import Config, anthropic_api_key, load
 
-MODEL = "claude-opus-4-7"
+MODEL = "claude-haiku-4-5"
 
 
 class Issue(BaseModel):
