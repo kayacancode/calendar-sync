@@ -5,7 +5,7 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from . import aggregate, auth, autolog, bestmate, blocks, engagements, mirror, sync, view
+from . import aggregate, auth, autolog, bestmate, blocks, engagements, mirror, monitor, sync, view
 from .config import load
 
 app = typer.Typer(help="forever22 — unified calendar across Kaya's accounts.", no_args_is_help=True)
@@ -122,6 +122,18 @@ def cmd_ask(query: str = typer.Argument(...), target: str = typer.Option(None, "
     else:
         console.print(f"[red]bestmate error:[/red] {result.error}")
         raise typer.Exit(code=1)
+
+
+@app.command("monitor")
+def cmd_monitor() -> None:
+    """Run the monitoring agent — assess system health and flag issues."""
+    report = monitor.run()
+    color = {"healthy": "green", "degraded": "yellow", "broken": "red"}.get(report.status, "white")
+    console.print(f"[{color}]●[/{color}] [bold]{report.status}[/bold] — {report.summary}")
+    for i in report.issues:
+        sev = {"info": "dim", "warning": "yellow", "alert": "red"}.get(i.severity, "white")
+        console.print(f"  [{sev}]{i.severity}[/{sev}] ({i.area}) {i.description}")
+        console.print(f"    → {i.suggested_action}")
 
 
 @app.command("web")

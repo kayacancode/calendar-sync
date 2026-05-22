@@ -64,3 +64,14 @@ jobs:
             cat aggregate-output.txt
             exit 1
           fi
+
+      - name: Monitor
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Full health report is ingested to bestmate; only the status line
+          # is echoed here to keep the public Actions log free of metadata.
+          f22 monitor > monitor-output.txt 2>&1 || true
+          head -1 monitor-output.txt || true

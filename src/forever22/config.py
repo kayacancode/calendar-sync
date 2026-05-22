@@ -72,24 +72,35 @@ class Config:
         return ACCOUNTS_DIR / f"{label}.json"
 
 
-def database_url() -> str:
-    """Postgres connection URL for the engagement database.
-
-    Read from the FOREVER22_DB_URL env var, falling back to a .env file at the
-    repo root. The env var is how the cloud workflow injects it (from a secret).
-    """
-    url = os.environ.get("FOREVER22_DB_URL")
-    if url:
-        return url
+def _env_value(key: str) -> str | None:
+    """Read a config value from the environment, falling back to a .env file
+    at the repo root. The env var is how the cloud workflows inject secrets."""
+    val = os.environ.get(key)
+    if val:
+        return val
     env_path = REPO_ROOT / ".env"
     if env_path.exists():
         for line in env_path.read_text().splitlines():
             line = line.strip()
-            if line.startswith("FOREVER22_DB_URL=") and not line.startswith("#"):
+            if line.startswith(f"{key}=") and not line.startswith("#"):
                 return line.split("=", 1)[1].strip()
-    raise RuntimeError(
-        "FOREVER22_DB_URL is not set — add it to the environment or a .env file."
-    )
+    return None
+
+
+def database_url() -> str:
+    """Postgres connection URL for the forever22 database."""
+    v = _env_value("FOREVER22_DB_URL")
+    if not v:
+        raise RuntimeError("FOREVER22_DB_URL is not set — add it to the environment or a .env file.")
+    return v
+
+
+def anthropic_api_key() -> str:
+    """Anthropic API key for the monitoring / commitment agents."""
+    v = _env_value("ANTHROPIC_API_KEY")
+    if not v:
+        raise RuntimeError("ANTHROPIC_API_KEY is not set — add it to the environment or a .env file.")
+    return v
 
 
 def load() -> Config:
