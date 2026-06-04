@@ -83,11 +83,16 @@ _schema_ready = False
 
 
 def _ensure_schema(conn) -> None:
+    # DDL is idempotent but still grabs table/index locks, so running it on every
+    # connection lets concurrent runs (15-min sync vs daily autolog) deadlock under
+    # statement_timeout. Skip it entirely once the schema is present.
     global _schema_ready
     if _schema_ready:
         return
-    conn.execute(SCHEMA)
-    conn.commit()
+    exists = conn.execute("SELECT to_regclass('public.events')").fetchone()
+    if not next(iter(exists.values())):
+        conn.execute(SCHEMA)
+        conn.commit()
     _schema_ready = True
 
 
