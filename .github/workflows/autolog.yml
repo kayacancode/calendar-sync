@@ -5,6 +5,13 @@ on:
     - cron: "0 7 * * *"    # daily ~07:00 UTC
   workflow_dispatch: {}
 
+# The frequent sync workflow may be paused automatically by GitHub after a
+# period without repository activity. Keep Actions write access narrowly
+# scoped so this daily watchdog can restore it without manual intervention.
+permissions:
+  actions: write
+  contents: read
+
 concurrency:
   group: calendar-sync-autolog
   cancel-in-progress: false
@@ -15,6 +22,11 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+
+      - name: Ensure frequent calendar sync is enabled
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow enable sync.yml --repo "$GITHUB_REPOSITORY"
 
       - uses: actions/setup-python@v5
         with:
