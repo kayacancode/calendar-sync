@@ -412,6 +412,71 @@ def _apply(conn, card_id: str, result: RunResult, cfg: Config) -> None:
                         visibility=cfg.bestmate.visibility, source="forever22-board")
 
 
+_RESEARCH_SYSTEM = (
+    "You are a research agent for one card on Kaya Jones's kanban board. Use web search to "
+    "investigate the open questions the card raises. Gather, don't act: no drafting, no "
+    "decisions — return findings. Be concrete: names, dates, numbers, links. End with a "
+    "'Sources:' list of the URLs that mattered, as markdown links. If the card gives you "
+    "nothing researchable, say so in one paragraph instead of padding."
+)
+
+RESEARCH_MAX_SEARCHES = 8
+
+
+def research_card(card_id: str, *, trigger: str = "research") -> dict:
+    started = _now()
+    with db.connect() as conn:
+        card = get_card(conn, card_id)
+        if not card:
+            raise KeyError(f"unknown card: {card_id}")
+        prompt = compose_prompt(conn, card)
+
+    client = anthropic.Anthropic(api_key=anthropic_api_key())
+    run_id = _id("r")
+    queries: list[str] = []
+    text_parts: list[str] = []
+    sources: list[dict] = []
+    try:
+        response = client.messages.create(
+            model=MODEL, max_tokens=16000, system=_RESEARCH_SYSTEM,
+            tools=[{"type": "web_search_20260209", "name": "web_search",
+                    "max_uses": RESEARCH_MAX_SEARCHES}],
+            messages=[{"role": "user", "content": prompt}],
+        )
+        for block in response.content:
+            if block.type == "server_tool_use" and block.name == "web_search":
+                if isinstance(block.input, dict):
+                    queries.append(block.input.get("query", ""))
+            elif block.type == "text":
+                text_parts.append(block.text)
+                for c in getattr(block, "citations", None) or []:
+                    url = getattr(c, "url", "")
+                    if url and url not in [s["url"] for s in sources]:
+                        sources.append({"title": getattr(c, "title", "") or url, "url": url})
+        findings = "".join(text_parts).strip()
+        status, note = "ok", f"{len(queries)} searches, {len(sources)} sources"
+    except Exception as e:
+        findings, status, note = "", "failed", str(e)[:500]
+
+    raw = json.dumps({"queries": queries, "findings": findings, "sources": sources})
+    with db.connect() as conn:
+        if status == "ok" and findings:
+            card = get_card(conn, card_id)
+            date = datetime.now().astimezone().strftime("%Y-%m-%d")
+            section = f"\n\n---\n**{date} · Research**\n{findings}"
+            if sources:
+                section += "\n\nSources:\n" + "\n".join(f"- [{s['title']}]({s['url']})" for s in sources)
+            conn.execute(
+                "UPDATE cards SET body = %s, dirty = 1, updated_at = %s WHERE card_id = %s",
+                ((card["body"].rstrip() + section).strip(), _now(), card_id))
+        conn.execute(
+            """INSERT INTO card_runs (run_id, card_id, trigger, prompt_sent, raw_output,
+               status, note, started_at, finished_at) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (run_id, card_id, trigger, prompt, raw, status, note, started, _now()),
+        )
+    return {"status": status, "note": note}
+
+
 def runnable(conn) -> list[dict]:
     return [c for c in active_cards(conn)
             if c["lane"] == "in_progress" and c["dirty"] and not blockers_pending(conn, c)]

@@ -155,20 +155,23 @@ _running_cards: set[str] = set()
 _running_lock = threading.Lock()
 
 
-def _run_card_bg(card_id: str, trigger: str) -> None:
+def _run_card_bg(card_id: str, trigger: str, research: bool = False) -> None:
     with _running_lock:
         if card_id in _running_cards:
             return
         _running_cards.add(card_id)
     try:
-        board.run_card(card_id, trigger=trigger)
+        if research:
+            board.research_card(card_id)
+        else:
+            board.run_card(card_id, trigger=trigger)
     finally:
         with _running_lock:
             _running_cards.discard(card_id)
 
 
-def _spawn_run(card_id: str, trigger: str) -> None:
-    threading.Thread(target=_run_card_bg, args=(card_id, trigger), daemon=True).start()
+def _spawn_run(card_id: str, trigger: str, research: bool = False) -> None:
+    threading.Thread(target=_run_card_bg, args=(card_id, trigger, research), daemon=True).start()
 
 
 def _tag_color(tag: str, account_colors: dict[str, str]) -> str:
@@ -244,6 +247,14 @@ def _run_view(r: dict, titles: dict[str, str]) -> dict:
     if r["raw_output"]:
         try:
             out = json.loads(r["raw_output"])
+            if "queries" in out:
+                for q in out["queries"]:
+                    actions.append({"tool": "web_search", "detail": q})
+                if out.get("findings"):
+                    first = next((ln for ln in out["findings"].splitlines() if ln.strip()), "")
+                    actions.append({"tool": "update_body",
+                                    "detail": f"research · {len(out.get('sources') or [])} sources · {first[:60]}"})
+                return {**r, "actions": actions}
             body = out.get("body") or ""
             first = next((ln for ln in body.splitlines() if ln.strip()), "")
             actions.append({"tool": "update_body", "detail": f"{len(body)} chars · {first[:70]}"})
@@ -310,6 +321,12 @@ def board_message(card_id: str, body: str = Form(...), run_now: str = Form("")):
 @app.post("/board/cards/{card_id}/run")
 def board_run_now(card_id: str):
     _spawn_run(card_id, "manual")
+    return RedirectResponse(f"/board/cards/{card_id}", status_code=303)
+
+
+@app.post("/board/cards/{card_id}/research")
+def board_research(card_id: str):
+    _spawn_run(card_id, "research", research=True)
     return RedirectResponse(f"/board/cards/{card_id}", status_code=303)
 
 

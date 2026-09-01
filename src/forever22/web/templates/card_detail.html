@@ -13,6 +13,7 @@
 
 <div class="card-actions">
   <form method="post" action="/board/cards/{{ c.card_id }}/run"><button type="submit" {% if running %}disabled{% endif %}>run agent now</button></form>
+  <form method="post" action="/board/cards/{{ c.card_id }}/research"><button type="submit" {% if running %}disabled{% endif %}>research</button></form>
   <form method="post" action="/board/cards/{{ c.card_id }}/archive"><button class="link-btn" type="submit">archive card</button></form>
 </div>
 

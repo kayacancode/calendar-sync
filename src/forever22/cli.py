@@ -369,6 +369,16 @@ def cmd_board_run(card_id: str = typer.Argument(...)) -> None:
         raise typer.Exit(code=1)
 
 
+@board_app.command("research")
+def cmd_board_research(card_id: str = typer.Argument(...)) -> None:
+    """Run a web-search research pass on one card; findings land in its body."""
+    out = board.research_card(card_id)
+    color = "green" if out["status"] == "ok" else "red"
+    console.print(f"[{color}]{out['status']}[/{color}] {out['note']}")
+    if out["status"] == "failed":
+        raise typer.Exit(code=1)
+
+
 @board_app.command("tick")
 def cmd_board_tick(skip_ingest: bool = typer.Option(False, "--skip-ingest")) -> None:
     """Scheduled pass: ingest, then fire dirty in-progress cards."""
