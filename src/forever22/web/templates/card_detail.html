@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ c.title }} · board{% endblock %}
+{% block content %}
+<p class="file-path"><a href="/board">← board</a></p>
+<h1>{{ c.title }}</h1>
+<p class="meta">
+  {% if c.tag %}<span class="tag" style="--tag-color: {{ tag_color }}">{{ c.tag }}</span> · {% endif %}
+  {{ c.card_id }} · lane: <strong>{{ c.lane }}</strong> · origin: {{ c.origin }}
+  {% if c.dirty %} · <span class="badge dirty">dirty — fires next tick</span>{% endif %}
+  {% if running %} · <span class="badge spin">⟳ running</span>{% endif %}
+  {% if pending %} · <span class="warn">blocked by: {{ pending | join(', ') }}</span>{% endif %}
+</p>
+
+<div class="card-actions">
+  <form method="post" action="/board/cards/{{ c.card_id }}/run"><button type="submit" {% if running %}disabled{% endif %}>run agent now</button></form>
+  <form method="post" action="/board/cards/{{ c.card_id }}/archive"><button class="link-btn" type="submit">archive card</button></form>
+</div>
+
+<form class="card-edit" method="post" action="/board/cards/{{ c.card_id }}/edit">
+  <label>title <input type="text" name="title" value="{{ c.title }}"></label>
+  <label>standing prompt <textarea name="prompt" rows="3">{{ c.prompt }}</textarea></label>
+  <label>body <textarea name="body" rows="14">{{ c.body }}</textarea></label>
+  <label>tag <input type="text" name="tag" value="{{ c.tag }}"></label>
+  <label>blocked by (card ids, comma-separated) <input type="text" name="blocked_by" value="{{ blocked_by | join(', ') }}"></label>
+  <button type="submit">save (marks dirty)</button>
+</form>
+
+{% if sources %}
+<h2>sources</h2>
+<ul>
+  {% for s in sources %}<li>{{ s.date }} · {% if s.url %}<a href="{{ s.url }}">{{ s.title }}</a>{% else %}{{ s.title }}{% endif %}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2>respond to this agent</h2>
+<form class="card-edit reply" method="post" action="/board/cards/{{ c.card_id }}/message">
+  <textarea name="body" rows="3" placeholder="feedback or direction for the agent — it reads this on its next run" required></textarea>
+  <div class="reply-actions">
+    <button type="submit">send</button>
+    <button type="submit" name="run_now" value="1">send + run now</button>
+  </div>
+</form>
+
+{% if thread %}
+<h2>messages</h2>
+<ul class="thread">
+  {% for m in thread %}
+  <li>
+    <span class="meta">{{ m.created_at[:16].replace('T', ' ') }}</span>
+    <strong>{{ titles.get(m.from_card, m.from_card or 'kaya') }}</strong>
+    → {{ titles.get(m.to_card, m.to_card or 'kaya') }}:
+    <div class="msg-body">{{ m.body }}</div>
+  </li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+<h2>run log</h2>
+{% if not runs %}<p class="empty">(no runs yet)</p>{% endif %}
+{% for r in runs %}
+<details class="run" {% if loop.first %}open{% endif %}>
+  <summary>
+    <span class="status status-{{ 'active' if r.status == 'ok' else 'paused' }}">{{ r.status }}</span>
+    {{ r.started_at[:16].replace('T', ' ') }} · {{ r.trigger }} — {{ r.note }}
+  </summary>
+  {% if r.actions %}
+  <div class="trace">
+    {% for a in r.actions %}
+    <div class="trace-line"><span class="trace-dot">⏺</span><code>{{ a.tool }}</code><span class="trace-detail">{{ a.detail }}</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+  <details class="raw"><summary>prompt sent</summary><pre class="notes">{{ r.prompt_sent }}</pre></details>
+  <details class="raw"><summary>raw output</summary><pre class="notes">{{ r.raw_output }}</pre></details>
+</details>
+{% endfor %}
+
+<script>
+const reply = document.querySelector('form.reply textarea');
+if (reply) reply.addEventListener('keydown', e => {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+    e.preventDefault();
+    document.querySelector('form.reply button[name=run_now]').click();
+  }
+});
+{% if running %}setTimeout(() => location.reload(), 4000);{% endif %}
+</script>
+{% endblock %}

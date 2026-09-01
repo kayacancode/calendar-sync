@@ -103,6 +103,14 @@ def anthropic_api_key() -> str:
     return v
 
 
+def granola_api_key() -> str:
+    """Granola public API key (grn_…) for board ingest."""
+    v = _env_value("GRANOLA_API_KEY")
+    if not v:
+        raise RuntimeError("GRANOLA_API_KEY is not set — add it to the environment or a .env file.")
+    return v
+
+
 def load() -> Config:
     with CONFIG_PATH.open() as f:
         raw = yaml.safe_load(f)

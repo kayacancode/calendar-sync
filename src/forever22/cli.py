@@ -5,14 +5,16 @@ from rich.console import Console
 from rich.table import Table
 from rich.text import Text
 
-from . import aggregate, auth, autolog, bestmate, blocks, engagements, mirror, monitor, sync, view
+from . import aggregate, auth, autolog, bestmate, blocks, board, db, engagements, mirror, monitor, sync, view
 from .config import load
 
 app = typer.Typer(help="forever22 — unified calendar across Kaya's accounts.", no_args_is_help=True)
 eng_app = typer.Typer(help="Track client + community engagements.", no_args_is_help=True)
 block_app = typer.Typer(help="Hold time across calendars (busy-everywhere or reserved-for-client).", no_args_is_help=True)
+board_app = typer.Typer(help="Agent kanban board — cards are agents fed by Granola.", no_args_is_help=True)
 app.add_typer(eng_app, name="eng")
 app.add_typer(block_app, name="block")
+app.add_typer(board_app, name="board")
 console = Console()
 
 
@@ -323,6 +325,77 @@ def cmd_block_delete(block_id: str = typer.Argument(...)) -> None:
         console.print(f"[yellow]warnings:[/yellow]")
         for err in errors:
             console.print(f"  - {err}")
+
+
+@board_app.command("list")
+def cmd_board_list() -> None:
+    """Show the board."""
+    with db.connect() as conn:
+        cards = board.active_cards(conn)
+        runs = board.last_runs(conn)
+    if not cards:
+        console.print("[dim](no cards — try `f22 board ingest`)[/dim]")
+        return
+    table = Table(title="board", show_lines=False)
+    for col in ("ID", "Lane", "Title", "Origin", "State", "Last run"):
+        table.add_column(col)
+    for c in cards:
+        r = runs.get(c["card_id"])
+        state = []
+        if c["dirty"]:
+            state.append("dirty")
+        if r and r["status"] != "ok":
+            state.append(f"[red]{r['status']}[/red]")
+        table.add_row(c["card_id"], c["lane"], c["title"][:50], c["origin"],
+                      " ".join(state), (r["note"] or "")[:60] if r else "")
+    console.print(table)
+
+
+@board_app.command("ingest")
+def cmd_board_ingest(max_notes: int = typer.Option(20, "--max-notes", "-n")) -> None:
+    """Pull recent Granola notes and create/merge cards."""
+    summary = board.ingest(max_notes=max_notes)
+    console.print(f"[green]✓[/green] ingest: {summary['new']} new, {summary['updated']} merged, "
+                  f"{summary['skipped']} skipped from {summary['notes']} notes")
+
+
+@board_app.command("run")
+def cmd_board_run(card_id: str = typer.Argument(...)) -> None:
+    """Run one card's agent now."""
+    out = board.run_card(card_id, trigger="manual")
+    color = {"ok": "green", "blocked": "yellow"}.get(out["status"], "red")
+    console.print(f"[{color}]{out['status']}[/{color}] {out['note']}")
+    if out["status"] == "failed":
+        raise typer.Exit(code=1)
+
+
+@board_app.command("tick")
+def cmd_board_tick(skip_ingest: bool = typer.Option(False, "--skip-ingest")) -> None:
+    """Scheduled pass: ingest, then fire dirty in-progress cards."""
+    report = board.tick(skip_ingest=skip_ingest)
+    ing = report["ingest"]
+    if ing:
+        if "error" in ing:
+            console.print(f"[red]ingest failed:[/red] {ing['error']}")
+        else:
+            console.print(f"ingest: {ing['new']} new, {ing['updated']} merged from {ing['notes']} notes")
+    for r in report["runs"]:
+        color = {"ok": "green", "blocked": "yellow"}.get(r["status"], "red")
+        console.print(f"[{color}]{r['status']}[/{color}] {r['card_id']}: {r['note']}")
+    if not report["runs"]:
+        console.print("[dim](no cards due)[/dim]")
+
+
+@board_app.command("add")
+def cmd_board_add(
+    title: str = typer.Argument(...),
+    prompt: str = typer.Option("", "--prompt", "-p", help="The agent's standing instruction"),
+    lane: str = typer.Option("todo", "--lane", "-l"),
+) -> None:
+    """Add a manual card."""
+    with db.connect() as conn:
+        card_id = board.create_card(conn, title=title, prompt=prompt, lane=lane)
+    console.print(f"[green]✓[/green] {card_id} in {lane}")
 
 
 if __name__ == "__main__":

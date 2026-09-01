@@ -29,6 +29,9 @@ All bestmate calls go through `src/forever22/bestmate.py` — don't shell out to
 - `f22 today` / `f22 week` — merged terminal views
 - `f22 block create|list|delete` — held-time blocks
 - `f22 eng list|add|show|log` — engagement tracking
+- `f22 board list|add|ingest|run <id>|tick` — agent kanban board: cards are agents fed
+  by Granola notes (`GRANOLA_API_KEY` in `.env`), run via the Anthropic API, board at
+  `/board` on the dashboard. Spec: `docs/superpowers/specs/2026-08-31-agent-kanban-board-design.md`
 - `f22 web` — local dashboard on http://localhost:8022
 - `f22 status` / `f22 ask <query>`
 

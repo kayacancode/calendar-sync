@@ -79,6 +79,49 @@ CREATE TABLE IF NOT EXISTS aggregated (
 );
 """
 
+BOARD_SCHEMA = """
+CREATE TABLE IF NOT EXISTS cards (
+    card_id     TEXT PRIMARY KEY,
+    title       TEXT NOT NULL,
+    lane        TEXT NOT NULL DEFAULT 'inbox',
+    position    INTEGER NOT NULL DEFAULT 0,
+    prompt      TEXT NOT NULL DEFAULT '',
+    body        TEXT NOT NULL DEFAULT '',
+    tag         TEXT NOT NULL DEFAULT '',
+    sources     TEXT NOT NULL DEFAULT '[]',
+    blocked_by  TEXT NOT NULL DEFAULT '[]',
+    origin      TEXT NOT NULL DEFAULT 'manual',
+    dirty       INTEGER NOT NULL DEFAULT 0,
+    archived    INTEGER NOT NULL DEFAULT 0,
+    created_at  TEXT NOT NULL,
+    updated_at  TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS cards_lane ON cards(lane, archived);
+
+CREATE TABLE IF NOT EXISTS card_runs (
+    run_id      TEXT PRIMARY KEY,
+    card_id     TEXT NOT NULL,
+    trigger     TEXT NOT NULL,
+    prompt_sent TEXT NOT NULL,
+    raw_output  TEXT,
+    status      TEXT NOT NULL,
+    note        TEXT,
+    started_at  TEXT NOT NULL,
+    finished_at TEXT
+);
+CREATE INDEX IF NOT EXISTS card_runs_card ON card_runs(card_id, started_at);
+
+CREATE TABLE IF NOT EXISTS card_messages (
+    msg_id     TEXT PRIMARY KEY,
+    from_card  TEXT,
+    to_card    TEXT,
+    body       TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    read_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS card_messages_to ON card_messages(to_card, read_at);
+"""
+
 _schema_ready = False
 
 
@@ -92,6 +135,10 @@ def _ensure_schema(conn) -> None:
     exists = conn.execute("SELECT to_regclass('public.events')").fetchone()
     if not next(iter(exists.values())):
         conn.execute(SCHEMA)
+        conn.commit()
+    board = conn.execute("SELECT to_regclass('public.cards')").fetchone()
+    if not next(iter(board.values())):
+        conn.execute(BOARD_SCHEMA)
         conn.commit()
     _schema_ready = True
 

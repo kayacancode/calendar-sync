@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}board · forever22{% endblock %}
+{% block content %}
+<h1>agent board</h1>
+
+<div class="board-toolbar">
+  {% if last_ingest %}
+  <span class="meta">last ingest {{ last_ingest.at[:16].replace('T', ' ') }} —
+    {% if last_ingest.error %}<span class="warn">failed: {{ last_ingest.error }}</span>
+    {% else %}{{ last_ingest.new }} new · {{ last_ingest.updated }} merged · {{ last_ingest.notes }} notes{% endif %}
+  </span>
+  {% else %}<span class="meta">no ingest yet</span>{% endif %}
+  <form method="post" action="/board/ingest"><button type="submit">ingest now</button></form>
+  <details class="new-card">
+    <summary>+ new card</summary>
+    <form method="post" action="/board/cards">
+      <input type="text" name="title" placeholder="title" required>
+      <textarea name="prompt" placeholder="standing prompt for the agent (optional)"></textarea>
+      <select name="lane"><option value="todo">todo</option><option value="inbox">inbox</option></select>
+      <button type="submit">add</button>
+    </form>
+  </details>
+</div>
+
+{% if user_msgs %}
+<section class="user-msgs">
+  {% for m in user_msgs %}
+  <div class="user-msg">
+    <span class="from">{{ m.from_title }}</span>
+    <span class="body">{{ m.body }}</span>
+    <form method="post" action="/board/messages/{{ m.msg_id }}/read"><button type="submit">✓</button></form>
+  </div>
+  {% endfor %}
+</section>
+{% endif %}
+
+<div class="board">
+  {% for lane in lane_order %}
+  <div class="lane" data-lane="{{ lane }}">
+    <h2>{{ lane.replace('_', ' ') }} <span class="count">{{ lanes[lane] | length }}</span></h2>
+    {% for c in lanes[lane] %}
+    <div class="card{% if c.running %} running{% endif %}" draggable="true" data-card="{{ c.card_id }}">
+      <a class="card-title" href="/board/cards/{{ c.card_id }}">{{ c.title }}</a>
+      <div class="badges">
+        {% if c.tag %}<span class="tag" style="--tag-color: {{ c.tag_color }}">{{ c.tag }}</span>{% endif %}
+        <span class="badge origin-{{ c.origin }}">{{ {'granola': '🥣', 'manual': '✍️', 'agent': '🤖'}[c.origin] }}</span>
+        {% if c.running %}<span class="badge spin">⟳</span>{% endif %}
+        {% if c.blocked %}<span class="badge warn" title="blocked by: {{ c.blocked | join(', ') }}">⛔</span>{% endif %}
+        {% if c.warn %}<span class="badge warn">⚠</span>{% endif %}
+        {% if c.unread %}<span class="badge msg">✉ {{ c.unread }}</span>{% endif %}
+        {% if c.dirty %}<span class="badge dirty" title="will fire next tick">●</span>{% endif %}
+      </div>
+      {% if c.last_run_note %}<div class="last-run" title="{{ c.last_run_at }}">{{ c.last_run_note[:80] }}</div>{% endif %}
+      {% if lane == 'done' %}
+      <form method="post" action="/board/cards/{{ c.card_id }}/archive"><button class="link-btn" type="submit">archive</button></form>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+
+<script>
+let dragged = null;
+document.querySelectorAll('.card').forEach(el => {
+  el.addEventListener('dragstart', () => { dragged = el.dataset.card; el.classList.add('dragging'); });
+  el.addEventListener('dragend', () => el.classList.remove('dragging'));
+});
+document.querySelectorAll('.lane').forEach(el => {
+  el.addEventListener('dragover', e => { e.preventDefault(); el.classList.add('over'); });
+  el.addEventListener('dragleave', () => el.classList.remove('over'));
+  el.addEventListener('drop', async e => {
+    e.preventDefault();
+    el.classList.remove('over');
+    if (!dragged) return;
+    const form = new FormData();
+    form.append('lane', el.dataset.lane);
+    await fetch(`/board/cards/${dragged}/move`, { method: 'POST', body: form });
+    location.reload();
+  });
+});
+</script>
+{% endblock %}

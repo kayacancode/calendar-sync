@@ -18,8 +18,12 @@ other cards. Outlook bridge explicitly deferred.
   dirty in-progress cards.
 - Agent powers: board writes + bestmate ingest. **Never Salience** — no Salience field
   exists in the result schema, so it is structurally impossible.
-- Architecture: approach A — structured one-shot `claude -p` runs returning strict JSON;
+- Architecture: approach A — structured one-shot agent runs returning strict JSON;
   f22 parses and applies all writes. Board-MCP live sessions are a v2 swap.
+- Implementation deviation: runs use the anthropic SDK (`messages.parse` + pydantic,
+  the existing `monitor.py` pattern, model `claude-sonnet-5`) instead of shelling out to
+  `claude -p` — same structured-output contract, matches the repo, key already wired.
+  Web search deferred with it. DB is Postgres (repo migrated off SQLite), not SQLite.
 - Granola: official Granola API key (in `config.yaml`) pulls notes directly; Claude only
   extracts/merges.
 
