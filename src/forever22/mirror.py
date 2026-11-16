@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+from urllib.parse import urlsplit
 
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
@@ -64,15 +65,38 @@ def _start_end_fields(raw: dict) -> tuple[dict, dict]:
     return out_s, out_e
 
 
+def _meeting_link(raw: dict) -> str | None:
+    candidates = [raw.get("hangoutLink")]
+    candidates.extend(
+        entry.get("uri")
+        for entry in (raw.get("conferenceData") or {}).get("entryPoints", [])
+        if entry.get("entryPointType") == "video"
+    )
+    for candidate in candidates:
+        if not isinstance(candidate, str):
+            continue
+        try:
+            url = urlsplit(candidate)
+            if url.scheme in ("https", "http") and url.hostname:
+                return candidate
+        except ValueError:
+            continue
+    return None
+
+
 def _mirror_body(cfg: Config, source_label: str, src_row, src_raw: dict) -> dict:
     start, end = _start_end_fields(src_raw)
+    description = f"Auto-mirrored from {source_label} by forever22."
+    link = _meeting_link(src_raw)
+    if link:
+        description += f"\n\nJoin meeting: {link}"
     return {
-        "summary": f"{cfg.mirror.mirror_title} — {source_label}",
+        "summary": src_row["summary"] or f"{cfg.mirror.mirror_title} — {source_label}",
         "start": start,
         "end": end,
         "transparency": "opaque",
         "visibility": "private",
-        "description": f"Auto-mirrored from {source_label} by forever22.",
+        "description": description,
         "extendedProperties": {
             "private": {MIRRORED_FROM_KEY: f"{source_label}:{src_row['event_id']}"}
         },
@@ -111,6 +135,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
         # (target_label, "<source_label>:<source_event_id>"). Lets a fresh DB
         # take ownership of existing mirrors instead of creating duplicates.
         adopt_map: dict[tuple[str, str], str] = {}
+        target_events: dict[tuple[str, str], dict] = {}
         for r in conn.execute("SELECT account_label, event_id, raw_json FROM events"):
             try:
                 raw = json.loads(r["raw_json"])
@@ -119,6 +144,7 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
             mf = raw.get("extendedProperties", {}).get("private", {}).get(MIRRORED_FROM_KEY)
             if mf:
                 adopt_map[(r["account_label"], mf)] = r["event_id"]
+                target_events[(r["account_label"], r["event_id"])] = raw
 
         for source_label, targets in cfg.mirror.rules.items():
             source_events = conn.execute(
@@ -185,7 +211,9 @@ def run(*, cfg: Config | None = None) -> MirrorReport:
                     else:
                         if (existing["source_start_iso"] != src["start_iso"]
                                 or existing["source_end_iso"] != src["end_iso"]
-                                or (existing["source_summary"] or "") != (src["summary"] or "")):
+                                or (existing["source_summary"] or "") != (src["summary"] or "")
+                                or any(target_events.get((target_label, existing["target_event_id"]), {}).get(k) != body[k]
+                                       for k in ("summary", "description"))):
                             try:
                                 target_service.events().patch(
                                     calendarId="primary",
