@@ -159,3 +159,10 @@ def test_fresh_db_adopts_existing_aggregate_calendar_and_event(monkeypatch):
     service.calendars.return_value.insert.assert_not_called()
     service.events.return_value.insert.assert_not_called()
     c.close()
+
+
+def test_http_client_is_an_explicit_runtime_dependency():
+    import tomllib
+    from pathlib import Path
+    project = tomllib.loads((Path(__file__).parents[1] / 'pyproject.toml').read_text())
+    assert any(d.startswith('httpx>=') for d in project['project']['dependencies'])
