@@ -1,6 +1,6 @@
 # Calendar database migration to Cloudflare D1
 
-Status: proposed; scope agreed, implementation pending design approval.
+Status: approved for implementation. User explicitly accepts a fresh database without recovering Supabase history.
 
 Move shared application storage from Supabase PostgreSQL to Cloudflare D1. Keep the Python application, Google Calendar integrations, local dashboard, and GitHub Actions schedules.
 
@@ -27,7 +27,7 @@ Protect read–modify–write operations with conditional updates or database-en
 5. Test read-only application access first, then run one controlled sync and verify its result before resuming schedules. Update both Actions workflows and local configuration together.
 6. Retain the old database and export. Rollback after D1 writes requires reconciling those writes; switching the URL alone is insufficient.
 
-If Supabase remains unavailable, complete the new backend but do not enable calendar writes against an empty database. The local events.db is dated May 22 and is not automatically a trustworthy current backup. Recover the existing database or explicitly design reconstruction of synthetic calendar tracking before cutover.
+User-authorized fresh start: do not import the stale local events.db. Existing mirror events and the aggregate calendar/copies are adopted by their existing Google tags and calendar name. Test these adoption paths before cutover. Historic board cards, engagement records, time logs, and held-block tracking are intentionally not recovered. Existing Google events remain in place.
 
 ## Validation
 
@@ -38,3 +38,5 @@ Cover storage behavior against local D1: event upserts, mirror/aggregate mapping
 Preserve unrelated uncommitted dashboard and board changes. Do not delete Supabase resources or replace Google OAuth credentials. No UI redesign, scheduler migration, or new paid plan is included. Determine exact batching, service operation boundaries, and test fixtures during implementation; preserve behavior rather than providing a generic public SQL gateway.
 
 References: https://developers.cloudflare.com/d1/tutorials/build-an-api-to-access-d1/ ; https://developers.cloudflare.com/d1/worker-api/d1-database/
+
+Implementation choice: each small application unit of work receives a consistent, bounded snapshot and runs against private in-memory SQLite. Commit sends only row changes to a fixed table/column API, with an atomic global revision guard. This preserves reads after writes and transaction rollback. The client refuses snapshots over 16 MiB, and commits over 8 MiB; larger workloads require a different access pattern. Concurrent writes fail explicitly; no automatic replay of external calendar operations.

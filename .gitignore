@@ -26,3 +26,6 @@ dist/
 
 # misc
 .DS_Store
+node_modules/
+.wrangler/
+.dev.vars
