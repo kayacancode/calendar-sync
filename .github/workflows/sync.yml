@@ -43,6 +43,8 @@ jobs:
 
       - name: Sync
         env:
+          FOREVER22_D1_URL: ${{ secrets.FOREVER22_D1_URL }}
+          FOREVER22_D1_TOKEN: ${{ secrets.FOREVER22_D1_TOKEN }}
           FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
         run: |
           if f22 sync > sync-output.txt 2>&1; then

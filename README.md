@@ -121,3 +121,57 @@ Runs `f22 sync` every 10 minutes (sync → mirror → aggregate). To stop: `laun
 
 - The unified calendar holds *copies* — edit events on their original calendar, not the aggregate.
 - Sync does a bounded windowed pull (`past_days` / `future_days`) each run, so the local cache stays small.
+
+## Shared database (Cloudflare D1)
+
+The Python app and both GitHub Actions workflows use a private Worker backed by D1.
+Set `FOREVER22_D1_URL` and `FOREVER22_D1_TOKEN` in the local, gitignored `.env`
+and in repository Actions secrets. The URL must use HTTPS; the service token stays
+on the Python/server side. Do not put the token in browser scripts or version control.
+When a D1 URL is configured it takes precedence over the legacy `FOREVER22_DB_URL`.
+Missing D1 credentials fail rather than silently falling back to PostgreSQL.
+
+To provision a separate installation:
+
+```bash
+cd cloudflare
+npm ci
+npx wrangler d1 create calendar-sync
+# Set the returned database ID in wrangler.jsonc.
+npx wrangler d1 migrations apply calendar-sync --remote
+npx wrangler secret put SERVICE_TOKEN
+npx wrangler deploy
+```
+
+Use the same securely generated token for `SERVICE_TOKEN` and `FOREVER22_D1_TOKEN`.
+The authenticated API accepts consistent snapshots and atomic row changes only, never
+caller-supplied SQL. Each Python connection uses a private SQLite snapshot and commits
+changed rows in one version-checked D1 batch. Concurrent changes raise a conflict;
+refresh state before retrying. A network error during commit can have an ambiguous
+outcome, so calendar operations are never automatically replayed.
+
+This is designed for this small personal dataset: snapshots are capped at 16 MiB /
+50,000 total rows and commit requests at 8 MiB. Exceeding a limit fails explicitly.
+D1's own per-row limits also apply. Review the access pattern before growing beyond
+these bounds. JSON fields use text, dates use ISO strings, and contact/time IDs remain
+auto-generated integers.
+
+The November 2026 cutover intentionally starts fresh: historic board cards, engagement
+records, time logs, and held-block tracking are not copied from unavailable Supabase.
+Google Calendar events remain; sync adopts tagged mirrors and existing aggregate
+calendar copies. The stale local `data/events.db` is not imported.
+
+For local service integration tests, apply migrations with `--local`, set a local
+`.dev.vars` containing `SERVICE_TOKEN=local-test-token`, then run:
+
+```bash
+# In cloudflare/:
+npx wrangler dev --local --port 8788
+# In the repository root, in another terminal:
+F22_D1_TEST_URL=http://127.0.0.1:8788 .venv/bin/python -m pytest tests/test_d1_service.py
+```
+
+Before future migrations, export a private backup with `wrangler d1 export calendar-sync
+--remote --output <private-backup-path>`. Do not commit backups. Rolling back after D1
+has accepted writes requires reconciling those changes; retaining the old PostgreSQL
+configuration alone does not preserve new D1 data.

@@ -1,0 +1,187 @@
+{
+  "events": {
+    "columns": [
+      "account_label",
+      "event_id",
+      "calendar_id",
+      "start_iso",
+      "end_iso",
+      "summary",
+      "status",
+      "is_busy",
+      "raw_json",
+      "synced_at"
+    ],
+    "keys": [
+      "account_label",
+      "event_id"
+    ]
+  },
+  "sync_state": {
+    "columns": [
+      "account_label",
+      "sync_token",
+      "last_full_at",
+      "last_run_at"
+    ],
+    "keys": [
+      "account_label"
+    ]
+  },
+  "mirrors": {
+    "columns": [
+      "source_account_label",
+      "source_event_id",
+      "target_account_label",
+      "target_event_id",
+      "source_start_iso",
+      "source_end_iso",
+      "source_summary",
+      "created_at",
+      "updated_at"
+    ],
+    "keys": [
+      "source_account_label",
+      "source_event_id",
+      "target_account_label"
+    ]
+  },
+  "blocks": {
+    "columns": [
+      "block_id",
+      "account_label",
+      "event_id",
+      "mode",
+      "target_label",
+      "start_iso",
+      "end_iso",
+      "reason",
+      "created_at"
+    ],
+    "keys": [
+      "block_id",
+      "account_label"
+    ]
+  },
+  "app_state": {
+    "columns": [
+      "key",
+      "value"
+    ],
+    "keys": [
+      "key"
+    ]
+  },
+  "aggregated": {
+    "columns": [
+      "ical_uid",
+      "source_account",
+      "source_event_id",
+      "agg_event_id",
+      "start_iso",
+      "end_iso",
+      "summary",
+      "updated_at"
+    ],
+    "keys": [
+      "ical_uid"
+    ]
+  },
+  "cards": {
+    "columns": [
+      "card_id",
+      "title",
+      "lane",
+      "position",
+      "prompt",
+      "body",
+      "tag",
+      "sources",
+      "blocked_by",
+      "origin",
+      "dirty",
+      "archived",
+      "created_at",
+      "updated_at"
+    ],
+    "keys": [
+      "card_id"
+    ]
+  },
+  "card_runs": {
+    "columns": [
+      "run_id",
+      "card_id",
+      "trigger",
+      "prompt_sent",
+      "raw_output",
+      "status",
+      "note",
+      "started_at",
+      "finished_at"
+    ],
+    "keys": [
+      "run_id"
+    ]
+  },
+  "card_messages": {
+    "columns": [
+      "msg_id",
+      "from_card",
+      "to_card",
+      "body",
+      "created_at",
+      "read_at"
+    ],
+    "keys": [
+      "msg_id"
+    ]
+  },
+  "engagements": {
+    "columns": [
+      "slug",
+      "title",
+      "type",
+      "status",
+      "client",
+      "start_date",
+      "end_date",
+      "hours_committed_per_week",
+      "calendar_account",
+      "links",
+      "tags",
+      "notes",
+      "created_at",
+      "updated_at"
+    ],
+    "keys": [
+      "slug"
+    ]
+  },
+  "contacts": {
+    "columns": [
+      "id",
+      "engagement_slug",
+      "name",
+      "email",
+      "role"
+    ],
+    "keys": [
+      "id"
+    ]
+  },
+  "time_log": {
+    "columns": [
+      "id",
+      "engagement_slug",
+      "entry_date",
+      "hours",
+      "note",
+      "source_event_id",
+      "created_at"
+    ],
+    "keys": [
+      "id"
+    ]
+  }
+}

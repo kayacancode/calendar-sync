@@ -95,12 +95,20 @@ def slugify(text: str) -> str:
 
 
 def _connect():
+    from . import d1
+    if d1.enabled():
+        return d1.D1Connection()
     return psycopg.connect(
         database_url(), prepare_threshold=None, connect_timeout=20, row_factory=dict_row
     )
 
 
 def ensure_schema() -> None:
+    from . import d1
+    if d1.enabled():
+        with _connect():
+            pass
+        return
     with _connect() as conn:
         conn.execute(SCHEMA)
         conn.commit()
@@ -135,8 +143,8 @@ def _row_to_engagement(conn, row: dict) -> Engagement:
         hours_committed_per_week=row["hours_committed_per_week"],
         calendar_account=row["calendar_account"],
         contacts=contacts,
-        links=list(row["links"] or []),
-        tags=list(row["tags"] or []),
+        links=json.loads(row["links"]) if isinstance(row["links"], str) else list(row["links"] or []),
+        tags=json.loads(row["tags"]) if isinstance(row["tags"], str) else list(row["tags"] or []),
         time_log=time_log,
         notes=row["notes"] or "",
     )

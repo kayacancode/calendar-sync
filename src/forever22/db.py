@@ -98,6 +98,11 @@ def _ensure_schema(conn) -> None:
 
 @contextmanager
 def connect():
+    from . import d1
+    if d1.enabled():
+        with d1.D1Connection() as conn:
+            yield conn
+        return
     conn = psycopg.connect(
         database_url(), prepare_threshold=None, connect_timeout=20, row_factory=dict_row
     )
