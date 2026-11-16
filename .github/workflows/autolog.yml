@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: calendar-sync-autolog
+  group: calendar-sync
   cancel-in-progress: false
 
 jobs:
@@ -55,6 +55,8 @@ jobs:
 
       - name: Autolog
         env:
+          FOREVER22_D1_URL: ${{ secrets.FOREVER22_D1_URL }}
+          FOREVER22_D1_TOKEN: ${{ secrets.FOREVER22_D1_TOKEN }}
           FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
         run: |
           if f22 autolog --lookback-days 35 > autolog-output.txt 2>&1; then
@@ -67,6 +69,8 @@ jobs:
 
       - name: Refresh unified calendar
         env:
+          FOREVER22_D1_URL: ${{ secrets.FOREVER22_D1_URL }}
+          FOREVER22_D1_TOKEN: ${{ secrets.FOREVER22_D1_TOKEN }}
           FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
         run: |
           if f22 aggregate --refresh > aggregate-output.txt 2>&1; then
@@ -80,6 +84,8 @@ jobs:
       - name: Monitor
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FOREVER22_D1_URL: ${{ secrets.FOREVER22_D1_URL }}
+          FOREVER22_D1_TOKEN: ${{ secrets.FOREVER22_D1_TOKEN }}
           FOREVER22_DB_URL: ${{ secrets.FOREVER22_DB_URL }}
           GH_TOKEN: ${{ github.token }}
         run: |

@@ -19,6 +19,7 @@ dependencies = [
     "psycopg[binary]>=3.2",
     "anthropic>=0.69",
     "pydantic>=2",
+    "httpx>=0.27",
 ]
 
 [project.scripts]
@@ -32,4 +33,5 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
+"forever22" = ["d1_schema.sql"]
 "forever22.web" = ["templates/*.html", "static/*"]

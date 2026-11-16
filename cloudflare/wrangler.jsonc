@@ -1,0 +1,10 @@
+{
+  "name": "calendar-sync-storage",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-16",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {"enabled": true},
+  "d1_databases": [{"binding": "DB", "database_name": "calendar-sync", "database_id": "515bc12f-8752-4d1f-955d-117f989e46b9", "migrations_dir": "migrations"}]
+}
